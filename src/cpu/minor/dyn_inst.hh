@@ -47,6 +47,7 @@
 #define __CPU_MINOR_DYN_INST_HH__
 
 #include <iostream>
+#include <array>
 
 #include "arch/generic/isa.hh"
 #include "base/named.hh"
@@ -188,6 +189,17 @@ class MinorDynInst : public RefCounted
     /** This instruction was predicted to change control flow and
      *  the following instructions will have a newer predictionSeqNum */
     bool predictedTaken = false;
+    
+    /** Tried to predict the value of this instruction */
+    bool predictedVal = false;
+
+    /** Holds the value predicted for all integer/floating point loads */
+    std::array<uint8_t, 8> predLoadVal = {0};
+
+    /** Holds the actual return value for a load after it is retrieved
+     *  from memory
+     */
+    std::array<uint8_t, 8> loadVal = {0};
 
     /** Predicted branch target */
     std::unique_ptr<PCStateBase> predictedTarget;

@@ -48,6 +48,7 @@
 #include "debug/Branch.hh"
 #include "debug/Fetch.hh"
 #include "debug/MinorTrace.hh"
+#include "debug/LVP.hh"
 
 namespace gem5
 {
@@ -74,6 +75,7 @@ Fetch2::Fetch2(const std::string &name,
     outputWidth(params.decodeInputWidth),
     processMoreThanOneInput(params.fetch2CycleInput),
     branchPredictor(*params.branchPred),
+    lvPredictor(*params.lvPred),
     fetchInfo(params.numThreads),
     threadPriority(0), stats(&cpu_)
 {
@@ -134,10 +136,32 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
     /* Don't even consider instructions we didn't try to predict or faults */
     if (inst->isFault() || !inst->triedToPredict)
         return;
+    
+    if(inst->staticInst->isLoad()) {
+        DPRINTF(LVP, "Recieved load inst: %s, updating LVP\n", *inst);
+        std::array<uint8_t, 8> pred_val = inst->predLoadVal;
+        std::array<uint8_t, 8> act_val = inst->loadVal;
+        DPRINTF(LVP, "Predicted Val: {%d, %d, %d, %d, %d, %d, %d, %d}\n",
+                (pred_val)[0], (pred_val)[1], (pred_val)[2], (pred_val)[3], (pred_val)[4], (pred_val)[5], (pred_val)[6], (pred_val)[7]);
+        DPRINTF(LVP, "Actual Val: {%d, %d, %d, %d, %d, %d, %d, %d}\n",
+                (act_val)[0], (act_val)[1], (act_val)[2], (act_val)[3], (act_val)[4], (act_val)[5], (act_val)[6], (act_val)[7]);
+
+    }
 
     switch (branch.reason) {
       case BranchData::NoBranch:
-        /* No data to update */
+        /** Even if there was no branch, we need to update LVPT and LCT based
+         *  on whether the value in memory matched the value in the LVPT or not
+         */
+        if(inst->staticInst->isLoad()) {
+            if(inst->predLoadVal == inst->loadVal) {
+                DPRINTF(LVP, "Correct load value predicted for inst: %s\n", *inst);
+                lvPredictor.update(inst->pc->instAddr(), true, inst->loadVal);
+            } else {
+                DPRINTF(LVP, "Incorrect load value predicted for inst: %s\n", *inst);
+                lvPredictor.update(inst->pc->instAddr(), false, inst->loadVal);
+            }
+        }
         break;
       case BranchData::Interrupt:
         /* Never try to predict interrupts */
@@ -164,19 +188,33 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
         break;
       case BranchData::CorrectlyPredictedBranch:
         /* Predicted taken, was taken */
-        DPRINTF(Branch, "Branch predicted correctly inst: %s\n", *inst);
-        branchPredictor.update(inst->id.fetchSeqNum,
-            inst->id.threadId);
+        // If this is a load, we must update LVPT
+        if(inst->staticInst->isLoad()) {
+            DPRINTF(LVP, "Correct load value predicted for inst: %s\n", *inst);
+
+            lvPredictor.update(inst->pc->instAddr(), true, inst->loadVal);
+        } else {
+            DPRINTF(Branch, "Branch predicted correctly inst: %s\n", *inst);
+            branchPredictor.update(inst->id.fetchSeqNum,
+                inst->id.threadId);
+        }
         break;
       case BranchData::BadlyPredictedBranch:
         /* Predicted taken, not taken */
-        DPRINTF(Branch, "Branch mis-predicted inst: %s\n", *inst);
-        branchPredictor.squash(inst->id.fetchSeqNum,
-            *branch.target /* Not used */, false, inst->id.threadId);
-        // Update after squashing to accomodate O3CPU
-        // using the branch prediction code.
-        branchPredictor.update(inst->id.fetchSeqNum,
-            inst->id.threadId);
+        // Once again, if this is a load we must update the lvpt
+        if(inst->staticInst->isLoad()) {
+            DPRINTF(LVP, "Incorrect load value predicted for inst: %s\n", *inst);
+
+            lvPredictor.update(inst->pc->instAddr(), false, inst->loadVal);
+        } else {
+            DPRINTF(Branch, "Branch mis-predicted inst: %s\n", *inst);
+            branchPredictor.squash(inst->id.fetchSeqNum,
+                *branch.target /* Not used */, false, inst->id.threadId);
+            // Update after squashing to accomodate O3CPU
+            // using the branch prediction code.
+            branchPredictor.update(inst->id.fetchSeqNum,
+                inst->id.threadId);
+        }
         break;
       case BranchData::BadlyPredictedBranchTarget:
         /* Predicted taken, was taken but to a different target */
@@ -210,12 +248,32 @@ Fetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             inst->predictedTaken = true;
             set(inst->predictedTarget, inst_pc);
         }
+    } else if (inst->staticInst->isLoad() && (inst->staticInst->isInteger() || inst->staticInst->isFloating())) {
+        std::unique_ptr<PCStateBase> inst_pc(inst->pc->clone());
+        // We attempt to predict the load value for any integer or floating point loads
+
+        // Same as control, we always mark as tried to predict
+        inst->triedToPredict = true;
+
+        DPRINTF(LVP, "Trying to predict value for inst %s\n", *inst);
+
+        //Do the prediction, obtaining the value from the LVPT
+        inst->predictedVal = lvPredictor.lookup(inst->pc->instAddr(), &(inst->predLoadVal));
+
+        // If we did predict taken, just set the target to the instruction PC to follow the branch requirements
+        if(inst->predictedVal) {
+            inst->staticInst->advancePC(*inst_pc);
+            set(branch.target, *inst_pc);
+            set(inst->predictedTarget, inst_pc);
+        }
+       
+
     } else {
         DPRINTF(Branch, "Not attempting prediction for inst: %s\n", *inst);
     }
 
     /* If we predict taken, set branch and update sequence numbers */
-    if (inst->predictedTaken) {
+    if (inst->predictedTaken || inst->predictedVal) {
         /* Update the predictionSeqNum and remember the streamSeqNum that it
          *  was associated with */
         thread.expectedStreamSeqNum = inst->id.streamSeqNum;

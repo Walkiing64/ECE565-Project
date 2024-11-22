@@ -46,6 +46,7 @@
 #define __CPU_MINOR_FETCH2_HH__
 
 #include <vector>
+#include <array>
 
 #include "base/named.hh"
 #include "cpu/minor/buffers.hh"
@@ -53,6 +54,7 @@
 #include "cpu/minor/pipe_data.hh"
 #include "cpu/pred/bpred_unit.hh"
 #include "params/BaseMinorCPU.hh"
+#include "cpu/pred/lv_predictor.hh"
 
 namespace gem5
 {
@@ -94,6 +96,9 @@ class Fetch2 : public Named
 
     /** Branch predictor passed from Python configuration */
     branch_prediction::BPredUnit &branchPredictor;
+
+    /** Load value predictor passed from Python configuration */
+    LVPredictor &lvPredictor;
 
   public:
     /* Public so that Pipeline can pass it to Fetch1 */
