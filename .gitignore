@@ -32,3 +32,12 @@ m5out
 configs/example/memcheck.cfg
 configs/dram/lowp_sweep.cfg
 .pyenv
+a.out
+minBranch.txt
+minExec.txt
+minFetch.txt
+minLVP.txt
+minMem.txt
+minMen.txt
+.vscode/settings.json
+benchmarks/daxpy-armv7-binary
