@@ -46,7 +46,7 @@ RESET = "\033[0m"
 
 # Iterate through the list of benchmarks
 for index, benchmark in enumerate(benchmarks):
-    print(f"{YELLOW}Running benchmark ({index}/{total}): {benchmark}{RESET}")
+    print(f"{YELLOW}Running benchmark ({index+1}/{total}): {benchmark}{RESET}")
     # Construct the command
     cmd = [
         gem5_executable,
@@ -69,6 +69,12 @@ for index, benchmark in enumerate(benchmarks):
             new_file = os.path.join(stats_dir, f"{benchmark}.stats")
             shutil.move(stats_file, new_file)
             print(f"{GREEN}✓ Saved stats for {benchmark} as {new_file}{RESET}")
+
+            # Parse the stats file
+            with open(new_file, "r") as f:
+                lines = f.readlines()
+                ipc = float(lines[22].split()[1])
+                print(f"{BLUE}IPC: {ipc}{RESET}")
         else:
             print(f"{RED}✗ Stats file not found for {benchmark}.{RESET}")
     except subprocess.CalledProcessError:
