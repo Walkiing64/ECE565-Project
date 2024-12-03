@@ -216,7 +216,7 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
       case BranchData::BadlyPredictedBranch:
         /* Predicted taken, not taken */
         // Once again, if this is a load we must update the lvpt
-        if(inst->staticInst->isLoad() !inst->predictedTaken) {
+        if(inst->staticInst->isLoad() && !inst->predictedTaken) {
             DPRINTF(LVP, "Incorrect load value predicted for inst: %s\n", *inst);
 
             lvPredictor.update(inst->pc->instAddr(), false, inst->loadPack);
