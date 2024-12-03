@@ -248,7 +248,7 @@ Fetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             inst->predictedTaken = true;
             set(inst->predictedTarget, inst_pc);
         }
-    } else if (inst->staticInst->isLoad() && (inst->staticInst->isInteger() || inst->staticInst->isFloating())) {
+    } else if (inst->staticInst->isLoad() && (inst->staticInst->isInteger() || inst->staticInst->isFloating()) && !inst->staticInst->isVector()) {
         std::unique_ptr<PCStateBase> inst_pc(inst->pc->clone());
         // We attempt to predict the load value for any integer or floating point loads
 
