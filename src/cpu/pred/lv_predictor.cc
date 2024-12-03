@@ -71,6 +71,8 @@ bool LVPredictor::lookup(Addr pc, PacketPtr* packet)
                 val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7]);
     } else {
         DPRINTF(LVP, "No valid entry in the LVPT for this index\n");
+        // Make sure we dont predict in this case, as that would cause issues later
+        predict = false;
     }
     
     return predict;

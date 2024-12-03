@@ -168,7 +168,7 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
          *  on whether the value in memory matched the value in the LVPT or not
          */
         if(inst->staticInst->isLoad()) {
-            if(inst->loadPack && pred_val == act_val) {
+            if(inst->predLoadPack && inst->loadPack && pred_val == act_val) {
                 DPRINTF(LVP, "Correct load value predicted for inst: %s\n", *inst);
                 lvPredictor.update(inst->pc->instAddr(), true, inst->loadPack);
             } else {

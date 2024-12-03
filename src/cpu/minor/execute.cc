@@ -561,7 +561,7 @@ Execute::executeMemRefInst(MinorDynInstPtr inst, BranchData &branch,
             if(inst->predictedVal && init_fault == NoFault) {
                 ExecContext context(cpu, *cpu.threads[inst->id.threadId], *this, inst);
 
-                Fault fault = inst->staticInst->completeAcc(inst->predLoadPack, &context, inst->traceData);
+                //Fault fault = inst->staticInst->completeAcc(inst->predLoadPack, &context, inst->traceData);
 
                 // Only enable other instructions to continue if there is no fault
                 if(fault == NoFault && inst->translationFault == NoFault) {
