@@ -556,21 +556,22 @@ Execute::executeMemRefInst(MinorDynInstPtr inst, BranchData &branch,
                 lsq.pushFailedRequest(inst);
                 inst->inLSQ = true;
             }
-        }
+            /* If LVP told us to predict this value, and there were no faults, try to
+            * complete the access early */
+            if(inst->predictedVal && init_fault == NoFault) {
+                ExecContext context(cpu, *cpu.threads[inst->id.threadId], *this, inst);
 
-        /* If LVP told us to predict this value, and there were no faults, try to
-         * complete the access early */
-        if(inst->predictedVal && init_fault == NoFault) {
-            ExecContext context(cpu, *cpu.threads[inst->id.threadId], *this, inst);
+                Fault fault = inst->staticInst->completeAcc(inst->predLoadPack, &context, inst->traceData);
 
-            Fault fault = inst->staticInst->completeAcc(inst->predLoadPack, &context, inst->traceData);
-
-            // Only enable other instructions to continue if there is no fault
-            if(fault == NoFault) {
-                DPRINTF(LVP, "Forwarding return value for load inst: %s\n", *inst);
-                //scoreboard[inst->id.threadId].clearInstDests(inst, true);
+                // Only enable other instructions to continue if there is no fault
+                if(fault == NoFault && inst->translationFault == NoFault) {
+                    DPRINTF(LVP, "Forwarding return value for load inst: %s\n", *inst);
+                    //scoreboard[inst->id.threadId].clearInstDests(inst, true);
+                }
             }
         }
+
+        
 
         /* Restore thread PC */
         thread->pcState(*old_pc);
