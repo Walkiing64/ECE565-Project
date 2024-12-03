@@ -133,14 +133,28 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
 {
     MinorDynInstPtr inst = branch.inst;
 
+    // Predicted values and loaded value for a posible load instruction
+    std::array<uint8_t, 8> pred_val = {0};
+    std::array<uint8_t, 8> act_val = {0};
+
     /* Don't even consider instructions we didn't try to predict or faults */
     if (inst->isFault() || !inst->triedToPredict)
         return;
     
     if(inst->staticInst->isLoad()) {
         DPRINTF(LVP, "Recieved load inst: %s, updating LVP\n", *inst);
-        std::array<uint8_t, 8> pred_val = inst->predLoadVal;
-        std::array<uint8_t, 8> act_val = inst->loadVal;
+        //The predicted packet could be empty if it was obtained from an invalid entry
+        if(inst->predLoadPack) {
+            for(int i = 0; i < inst->predLoadPack->getSize(); i++) {
+                pred_val[i] = inst->predLoadPack->getConstPtr<uint8_t>()[i];
+            }
+        }
+        if(inst->loadPack) {
+            for(int i = 0; i < inst->loadPack->getSize(); i++) {
+                act_val[i] = inst->loadPack->getConstPtr<uint8_t>()[i];
+            }
+        }
+        
         DPRINTF(LVP, "Predicted Val: {%d, %d, %d, %d, %d, %d, %d, %d}\n",
                 (pred_val)[0], (pred_val)[1], (pred_val)[2], (pred_val)[3], (pred_val)[4], (pred_val)[5], (pred_val)[6], (pred_val)[7]);
         DPRINTF(LVP, "Actual Val: {%d, %d, %d, %d, %d, %d, %d, %d}\n",
@@ -154,12 +168,12 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
          *  on whether the value in memory matched the value in the LVPT or not
          */
         if(inst->staticInst->isLoad()) {
-            if(inst->predLoadVal == inst->loadVal) {
+            if(inst->loadPack && pred_val == act_val) {
                 DPRINTF(LVP, "Correct load value predicted for inst: %s\n", *inst);
-                lvPredictor.update(inst->pc->instAddr(), true, inst->loadVal);
+                lvPredictor.update(inst->pc->instAddr(), true, inst->loadPack);
             } else {
                 DPRINTF(LVP, "Incorrect load value predicted for inst: %s\n", *inst);
-                lvPredictor.update(inst->pc->instAddr(), false, inst->loadVal);
+                lvPredictor.update(inst->pc->instAddr(), false, inst->loadPack);
             }
         }
         break;
@@ -189,10 +203,10 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
       case BranchData::CorrectlyPredictedBranch:
         /* Predicted taken, was taken */
         // If this is a load, we must update LVPT
-        if(inst->staticInst->isLoad()) {
+        if(inst->staticInst->isLoad() && !inst->predictedTaken) {
             DPRINTF(LVP, "Correct load value predicted for inst: %s\n", *inst);
 
-            lvPredictor.update(inst->pc->instAddr(), true, inst->loadVal);
+            lvPredictor.update(inst->pc->instAddr(), true, inst->loadPack);
         } else {
             DPRINTF(Branch, "Branch predicted correctly inst: %s\n", *inst);
             branchPredictor.update(inst->id.fetchSeqNum,
@@ -202,10 +216,10 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
       case BranchData::BadlyPredictedBranch:
         /* Predicted taken, not taken */
         // Once again, if this is a load we must update the lvpt
-        if(inst->staticInst->isLoad()) {
+        if(inst->staticInst->isLoad() !inst->predictedTaken) {
             DPRINTF(LVP, "Incorrect load value predicted for inst: %s\n", *inst);
 
-            lvPredictor.update(inst->pc->instAddr(), false, inst->loadVal);
+            lvPredictor.update(inst->pc->instAddr(), false, inst->loadPack);
         } else {
             DPRINTF(Branch, "Branch mis-predicted inst: %s\n", *inst);
             branchPredictor.squash(inst->id.fetchSeqNum,
@@ -248,7 +262,7 @@ Fetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
             inst->predictedTaken = true;
             set(inst->predictedTarget, inst_pc);
         }
-    } else if (inst->staticInst->isLoad() && (inst->staticInst->isInteger() || inst->staticInst->isFloating())) {
+    } else if (inst->staticInst->isLoad() && (inst->staticInst->isInteger() || inst->staticInst->isFloating()) && !inst->staticInst->isVector()) {
         std::unique_ptr<PCStateBase> inst_pc(inst->pc->clone());
         // We attempt to predict the load value for any integer or floating point loads
 
@@ -258,7 +272,7 @@ Fetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
         DPRINTF(LVP, "Trying to predict value for inst %s\n", *inst);
 
         //Do the prediction, obtaining the value from the LVPT
-        inst->predictedVal = lvPredictor.lookup(inst->pc->instAddr(), &(inst->predLoadVal));
+        inst->predictedVal = lvPredictor.lookup(inst->pc->instAddr(), &(inst->predLoadPack));
 
         // If we did predict taken, just set the target to the instruction PC to follow the branch requirements
         if(inst->predictedVal) {

@@ -300,7 +300,18 @@ Execute::tryToBranch(MinorDynInstPtr inst, Fault fault, BranchData &branch)
      *  Otherwise, we say it was a badly predicted branch
      */
     if(reason == BranchData::NoBranch && inst->predictedVal && !force_branch) {
-        if(inst->predLoadVal == inst->loadVal) {
+        // Predicted values and loaded value for a posible load instruction
+        std::array<uint8_t, 8> pred_val = {0};
+        std::array<uint8_t, 8> act_val = {0};
+
+        for(int i = 0; i < inst->predLoadPack->getSize(); i++) {
+            pred_val[i] = inst->predLoadPack->getConstPtr<uint8_t>()[i];
+        }
+        for(int i = 0; i < inst->loadPack->getSize(); i++) {
+            act_val[i] = inst->loadPack->getConstPtr<uint8_t>()[i];
+        }
+
+        if(pred_val == act_val) {
             // This is a correctly predicted branch
             reason = BranchData::CorrectlyPredictedBranch;
             DPRINTF(LVP, "Predicted Value for inst: %s correctly in execute\n", *inst);
@@ -412,13 +423,7 @@ Execute::handleMemResponse(MinorDynInstPtr inst,
              *  function, we need to copy this value into the instruction
              */
             DPRINTF(LVP, "Retrieving loaded memory value for inst: %s\n", *inst);
-            for(int i = 0; i < 8; i++) {
-                if(i < packet->getSize()) {
-                    inst->loadVal[i] = packet->getConstPtr<uint8_t>()[i];
-                } else {
-                    inst->loadVal[i] = 0;
-                }
-            }
+            inst->loadPack = new Packet(packet, false, true);
         }
 
         /* Complete the memory access instruction */
@@ -550,6 +555,20 @@ Execute::executeMemRefInst(MinorDynInstPtr inst, BranchData &branch,
                 /* Leave it up to commit to handle the fault */
                 lsq.pushFailedRequest(inst);
                 inst->inLSQ = true;
+            }
+        }
+
+        /* If LVP told us to predict this value, and there were no faults, try to
+         * complete the access early */
+        if(inst->predictedVal && init_fault == NoFault) {
+            ExecContext context(cpu, *cpu.threads[inst->id.threadId], *this, inst);
+
+            Fault fault = inst->staticInst->completeAcc(inst->predLoadPack, &context, inst->traceData);
+
+            // Only enable other instructions to continue if there is no fault
+            if(fault == NoFault) {
+                DPRINTF(LVP, "Forwarding return value for load inst: %s\n", *inst);
+                //scoreboard[inst->id.threadId].clearInstDests(inst, true);
             }
         }
 
@@ -798,18 +817,12 @@ Execute::issue(ThreadID thread_id)
 
                         /* Mark the destinations for this instruction as
                          *  busy, unless it is a predicted load instr */
-                        if(inst->staticInst->isLoad() && inst->predictedVal && !inst->isFault()) {
-                            DPRINTF(LVP, "Forwarding return value for load inst: %s\n", *inst);
-                            scoreboard[thread_id].markupInstDests(inst, cpu.curCycle() +
-                                Cycles(0), cpu.getContext(thread_id), false);
-                        } else {
-                            scoreboard[thread_id].markupInstDests(inst, cpu.curCycle() +
-                                fu->description.opLat +
-                                extra_dest_retire_lat +
-                                extra_assumed_lat,
-                                cpu.getContext(thread_id),
-                                issued_mem_ref && extra_assumed_lat == Cycles(0));
-                        }
+                        scoreboard[thread_id].markupInstDests(inst, cpu.curCycle() +
+                            fu->description.opLat +
+                            extra_dest_retire_lat +
+                            extra_assumed_lat,
+                            cpu.getContext(thread_id),
+                            issued_mem_ref && extra_assumed_lat == Cycles(0));
                         /* Push the instruction onto the inFlight queue so
                          *  it can be committed in order */
                         thread.inFlightInsts->push(fu_inst);

@@ -193,13 +193,13 @@ class MinorDynInst : public RefCounted
     /** Tried to predict the value of this instruction */
     bool predictedVal = false;
 
-    /** Holds the value predicted for all integer/floating point loads */
-    std::array<uint8_t, 8> predLoadVal = {0};
+    /** Holds the predicted packet for all integer/floating point loads */
+    PacketPtr predLoadPack = nullptr;
 
-    /** Holds the actual return value for a load after it is retrieved
+    /** Holds the actual return packet for a load after it is retrieved
      *  from memory
      */
-    std::array<uint8_t, 8> loadVal = {0};
+    PacketPtr loadPack = nullptr;
 
     /** Predicted branch target */
     std::unique_ptr<PCStateBase> predictedTarget;

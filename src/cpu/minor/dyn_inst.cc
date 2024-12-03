@@ -230,6 +230,14 @@ MinorDynInst::~MinorDynInst()
 {
     if (traceData)
         delete traceData;
+    
+    if(predLoadPack) {
+        delete predLoadPack;
+    }
+
+    if(loadPack) {
+        delete loadPack;
+    }
 }
 
 } // namespace minor

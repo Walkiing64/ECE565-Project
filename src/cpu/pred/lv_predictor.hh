@@ -7,6 +7,7 @@
 #include "params/LVPredictor.hh"
 #include "sim/sim_object.hh"
 #include "base/sat_counter.hh"
+#include "mem/packet.hh"
 
 namespace gem5 
 {
@@ -19,20 +20,25 @@ namespace gem5
             LVPredictor(const LVPredictorParams &p);
 
             /**
+             * Default Destructor
+             */
+            ~LVPredictor();
+
+            /**
              * Looks up the predicted value at the given pc addr.
              * @param pc The address of the loads pc
-             * @param val A pointer to where the predicted value will be placed
+             * @param packet A pointer to where the predicted values packet will be placed
              * @return Whether the value should be predicted or not 
              */
-            bool lookup(Addr pc, std::array<uint8_t, 8> *val);
+            bool lookup(Addr pc, PacketPtr* packet);
 
             /**
              * Updates the LVPT and LCT based on the actual outcome of the load
              * @param pc The address of the loads pc
              * @param correct Whether or not the value was predicted correctly by the LVPT
-             * @param val Value returned by the actual load
+             * @param packet Packet returned by the actual load
              */
-            void update(Addr pc, bool correct, std::array<uint8_t, 8> val);
+            void update(Addr pc, bool correct, PacketPtr packet);
         
         private:
             /**
@@ -66,10 +72,9 @@ namespace gem5
             const unsigned lvptIndMask;
 
             /**
-             * LVPT data structure, holds data arrays of size 8
-             * (Since data can be up to 8 bytes long)
+             * LVPT data structure, holds data response packet pointers
              */
-            std::vector<std::array<uint8_t, 8>> lvpt;
+            std::vector<PacketPtr> lvpt;
 
             /**
              * Number of entries in the LCT
