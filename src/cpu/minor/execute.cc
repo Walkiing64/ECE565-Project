@@ -559,14 +559,12 @@ Execute::executeMemRefInst(MinorDynInstPtr inst, BranchData &branch,
             /* If LVP told us to predict this value, and there were no faults, try to
             * complete the access early */
             if(inst->predictedVal && init_fault == NoFault && inst->translationFault == NoFault) {
-                ExecContext context(cpu, *cpu.threads[inst->id.threadId], *this, inst);
-
-                Fault fault = inst->staticInst->completeAcc(inst->predLoadPack, &context, inst->traceData);
+                //Fault fault = inst->staticInst->completeAcc(inst->predLoadPack, &context, inst->traceData);
 
                 // Only enable other instructions to continue if there is no fault
                 if(fault == NoFault && inst->translationFault == NoFault) {
                     DPRINTF(LVP, "Forwarding return value for load inst: %s\n", *inst);
-                    scoreboard[inst->id.threadId].clearInstDests(inst, true);
+                    //scoreboard[inst->id.threadId].clearInstDests(inst, true);
                 }
             }
         }
