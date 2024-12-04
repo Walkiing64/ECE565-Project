@@ -53,6 +53,7 @@
 #include "debug/MinorMem.hh"
 #include "debug/MinorTrace.hh"
 #include "debug/PCEvent.hh"
+#include "debug/LVP.hh"
 
 namespace gem5
 {
@@ -293,6 +294,35 @@ Execute::tryToBranch(MinorDynInstPtr inst, Fault fault, BranchData &branch)
         reason = BranchData::NoBranch;
     }
 
+    /** If there was no other branches, and this was a load,
+     *  we need to check if the load value was predicted properly.
+     *  If value was predicted properly, we say it is a correct branch.
+     *  Otherwise, we say it was a badly predicted branch
+     */
+    if(reason == BranchData::NoBranch && inst->predictedVal && !force_branch) {
+        // Predicted values and loaded value for a posible load instruction
+        std::array<uint8_t, 8> pred_val = {0};
+        std::array<uint8_t, 8> act_val = {0};
+
+        for(int i = 0; i < inst->predLoadPack->getSize(); i++) {
+            pred_val[i] = inst->predLoadPack->getConstPtr<uint8_t>()[i];
+        }
+        for(int i = 0; i < inst->loadPack->getSize(); i++) {
+            act_val[i] = inst->loadPack->getConstPtr<uint8_t>()[i];
+        }
+
+        if(pred_val == act_val) {
+            // This is a correctly predicted branch
+            reason = BranchData::CorrectlyPredictedBranch;
+            DPRINTF(LVP, "Predicted Value for inst: %s correctly in execute\n", *inst);
+        }
+        else {
+            // This is a badly predicted branch
+            reason = BranchData::BadlyPredictedBranch;
+            DPRINTF(LVP, "Predicted Value for inst: %s incorrectly in execute\n", *inst);
+        }
+    }
+
     updateBranchData(inst->id.threadId, reason, inst, *target, branch);
 }
 
@@ -319,6 +349,16 @@ Execute::updateBranchData(
             target, inst);
 
         DPRINTF(Branch, "Branch data signalled: %s\n", branch);
+    } else if(inst->staticInst->isLoad() && inst->triedToPredict && !inst->staticInst->isSyscall()) {
+        // Still create a branch data on NoBranch if it is a load instruction
+        branch = BranchData(reason, tid,
+            executeInfo[tid].streamSeqNum,
+            /* Maintaining predictionSeqNum if there's no inst is just a
+             * courtesy and looks better on minorview */
+            (inst->isBubble() ? executeInfo[tid].lastPredictionSeqNum
+                : inst->id.predictionSeqNum),
+            target, inst);
+        DPRINTF(LVP, "Branch data signalled for a load inst: %s\n", branch);
     }
 }
 
@@ -378,6 +418,12 @@ Execute::handleMemResponse(MinorDynInstPtr inst,
         if (is_load && packet->getSize() > 0) {
             DPRINTF(MinorMem, "Memory data[0]: 0x%x\n",
                 static_cast<unsigned int>(packet->getConstPtr<uint8_t>()[0]));
+
+            /** In order to check if the load value was correct in the branch
+             *  function, we need to copy this value into the instruction
+             */
+            DPRINTF(LVP, "Retrieving loaded memory value for inst: %s\n", *inst);
+            inst->loadPack = new Packet(packet, false, true);
         }
 
         /* Complete the memory access instruction */
@@ -510,7 +556,22 @@ Execute::executeMemRefInst(MinorDynInstPtr inst, BranchData &branch,
                 lsq.pushFailedRequest(inst);
                 inst->inLSQ = true;
             }
+            /* If LVP told us to predict this value, and there were no faults, try to
+            * complete the access early */
+            if(inst->predictedVal && init_fault == NoFault) {
+                ExecContext context(cpu, *cpu.threads[inst->id.threadId], *this, inst);
+
+                //Fault fault = inst->staticInst->completeAcc(inst->predLoadPack, &context, inst->traceData);
+
+                // Only enable other instructions to continue if there is no fault
+                if(fault == NoFault && inst->translationFault == NoFault) {
+                    DPRINTF(LVP, "Forwarding return value for load inst: %s\n", *inst);
+                    //scoreboard[inst->id.threadId].clearInstDests(inst, true);
+                }
+            }
         }
+
+        
 
         /* Restore thread PC */
         thread->pcState(*old_pc);
@@ -756,14 +817,13 @@ Execute::issue(ThreadID thread_id)
                         cpu.activityRecorder->activity();
 
                         /* Mark the destinations for this instruction as
-                         *  busy */
+                         *  busy, unless it is a predicted load instr */
                         scoreboard[thread_id].markupInstDests(inst, cpu.curCycle() +
                             fu->description.opLat +
                             extra_dest_retire_lat +
                             extra_assumed_lat,
                             cpu.getContext(thread_id),
                             issued_mem_ref && extra_assumed_lat == Cycles(0));
-
                         /* Push the instruction onto the inFlight queue so
                          *  it can be committed in order */
                         thread.inFlightInsts->push(fu_inst);

@@ -46,6 +46,11 @@ SimObject('BranchPredictor.py', sim_objects=[
     'MPP_LoopPredictor_8KB', 'MPP_StatisticalCorrector_8KB',
     'MultiperspectivePerceptronTAGE8KB'])
 
+# Load Value Predictor
+SimObject('LVPredictor.py', sim_objects=['LVPredictor'])
+Source('lv_predictor.cc')
+DebugFlag('LVP')
+
 DebugFlag('Indirect')
 Source('bpred_unit.cc')
 Source('2bit_local.cc')
