@@ -1,5 +1,5 @@
 #ifndef __CPU_PRED_LV_PREDICTOR_HH__
-#define __CPU_PRED_LV_PREDICTOR_HH__o
+#define __CPU_PRED_LV_PREDICTOR_HH__
 
 #include <vector>
 #include <array>
@@ -11,6 +11,63 @@
 
 namespace gem5 
 {
+    class CVU : public SimObject
+    {
+        public:
+            /**
+             * Default Constructor
+             */
+            CVU(const CVUParams &p);
+
+            /**
+             * Looks up if the given pc and load address are in the table
+             * @param pc The address of the instruction
+             * @param loadAddr The address of the data being predicted
+             */
+            bool lookup(Addr pc, Addr loadAddr);
+
+            /**
+             * Puts the given pc and load address in the CVU, replacing a
+             * value if there is no space
+             * @param pc The address of the instruction
+             * @param loadAddr The address of the data being predicted
+             */
+            void update(Addr pc, Addr loadAddr);
+
+            /**
+             * Invalidates any entries that match the address of the given store
+             * @param storeAddr The address of the store that is doing the
+             * invalidation
+             */
+            void invalidate(Addr storeAddr);
+        
+        private:
+            /**
+             * Structure for holding one CVU entry
+             * @param pc Address of the load that placed this entry
+             * @param addr Data address associated with this entry
+             * @param lru Number used to determine which entry has been used
+             * the least recently
+             * @param valid True if this is a valid entry, false otherwise
+             */
+            struct CVUEntry {
+                Addr pc;
+                Addr addr;
+                int lru;
+                bool valid;
+            };
+
+            /**
+             * Vector used to hold the CVU table
+             */
+            std::vector<CVUEntry> table;
+
+            /**
+             * number of valid entries currently in the table
+             */
+            int numEntries = 0;
+    };
+
     class LVPredictor : public SimObject 
     {
         public:
@@ -28,9 +85,12 @@ namespace gem5
              * Looks up the predicted value at the given pc addr.
              * @param pc The address of the loads pc
              * @param packet A pointer to where the predicted values packet will be placed
-             * @return Whether the value should be predicted or not 
+             * @return Whether the value should be predicted or not
+             *          0 = dont predict
+             *          1 = predict
+             *          2 = constant predict 
              */
-            bool lookup(Addr pc, PacketPtr* packet);
+            int lookup(Addr pc, PacketPtr* packet);
 
             /**
              * Updates the LVPT and LCT based on the actual outcome of the load
@@ -39,6 +99,11 @@ namespace gem5
              * @param packet Packet returned by the actual load
              */
             void update(Addr pc, bool correct, PacketPtr packet);
+
+            /**
+             * The CVU connected to this load value predictor
+             */
+            CVU &cvu;
         
         private:
             /**
@@ -48,6 +113,14 @@ namespace gem5
             *  @return The prediction based on the counter value.
             */
             inline bool getPrediction(uint8_t &count);
+
+            /**
+             * Returns constant/not constant for this prediction based on the
+             * given counter valut
+             * @param count The value of the counter
+             * @return The constant prediction based on the counter value
+             */
+            inline bool getConst(uint8_t &count);
 
             /** Calculates the LVPT index based on the PC. */
             inline unsigned getLVPTIndex(Addr &PC);
@@ -96,8 +169,6 @@ namespace gem5
              * counter
              */
             std::vector<SatCounter8> lct;
-
-             
     };
 } // namespace gem5
 

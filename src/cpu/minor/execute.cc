@@ -90,6 +90,7 @@ Execute::Execute(const std::string &name_,
         params.executeLSQTransfersQueueSize,
         params.executeLSQStoreBufferSize,
         params.executeLSQMaxStoreBufferStoresPerCycle),
+    cvu(params.lvPred->cvu),
     executeInfo(params.numThreads,
             ExecuteThreadInfo(params.executeCommitLimit)),
     interruptPriority(0),
@@ -414,6 +415,12 @@ Execute::handleMemResponse(MinorDynInstPtr inst,
 
         DPRINTF(MinorMem, "Memory response inst: %s addr: 0x%x size: %d\n",
             *inst, packet->getAddr(), packet->getSize());
+        
+        if(is_store) {
+            // If a store is about to complete, we need to invalidate all addresses
+            // in the CVU that match it
+            cvu.invalidate(packet->getAddr());
+        }
 
         if (is_load && packet->getSize() > 0) {
             DPRINTF(MinorMem, "Memory data[0]: 0x%x\n",
@@ -502,6 +509,23 @@ Execute::executeMemRefInst(MinorDynInstPtr inst, BranchData &branch,
     /* Set to true if the mem op. is issued and sent to the mem system */
     passed_predicate = false;
 
+    // Check if this is a constant load, and if it has a valid CVU entry
+    if(inst->constantVal) {
+        //Use the instruction address and the predicted values address to search the table
+        //(we must use the predicted address as we dont know what the physical address of 
+        // the load is before going to the lsq)
+        bool valid = cvu.lookup(inst->pc->instAddr(), inst->predLoadPack->getAddr());
+
+        //If the cvu entry was not valid, treat it as a predictable load, but also
+        //add its address to the table
+        if (!valid) {
+            inst->constantVal = false;
+
+            cvu.update(inst->pc->instAddr(), inst->predLoadPack->getAddr());
+        }
+
+    }
+
     if (!lsq.canRequest()) {
         /* Not acting on instruction yet as the memory
          * queues are full */
@@ -558,9 +582,7 @@ Execute::executeMemRefInst(MinorDynInstPtr inst, BranchData &branch,
             }
             /* If LVP told us to predict this value, and there were no faults, try to
             * complete the access early */
-            if(inst->predictedVal && init_fault == NoFault) {
-                ExecContext context(cpu, *cpu.threads[inst->id.threadId], *this, inst);
-
+            if(inst->predictedVal && init_fault == NoFault && inst->translationFault == NoFault) {
                 //Fault fault = inst->staticInst->completeAcc(inst->predLoadPack, &context, inst->traceData);
 
                 // Only enable other instructions to continue if there is no fault
