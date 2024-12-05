@@ -84,11 +84,10 @@ void CVU::update(Addr pc, Addr loadAddr) {
 void CVU::invalidate(Addr storeAddr) {
     //All values with this address must be invalidated (there could be multiple if two pcs are loading from
     //the same address)
-    DPRINTF(LVP, "Invalidating CVU entries with address 0x%x\n", storeAddr);
 
     for(int i = 0; i < table.size(); i++) {
         if(table[i].addr == storeAddr) {
-            DPRINTF(LVP, "Invalidating address at index %d\n and fixing LRU values", i);
+            DPRINTF(LVP, "Invalidating address 0x%x at index %d\n and fixing LRU values", storeAddr, i);
             table[i].valid = false;
 
             //Now the LRU values must be updated
