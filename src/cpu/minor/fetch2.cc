@@ -272,15 +272,7 @@ Fetch2::predictBranch(MinorDynInstPtr inst, BranchData &branch)
         DPRINTF(LVP, "Trying to predict value for inst %s\n", *inst);
 
         //Do the prediction, obtaining the value from the LVPT
-        int prediction = lvPredictor.lookup(inst->pc->instAddr(), &(inst->predLoadPack));
-        if(prediction > 0) {
-            inst->predictedVal = true;
-            if(prediction == 2) {
-                inst->constantVal = true;
-            }
-        } else {
-            inst->predictedVal = false;
-        }
+        inst->predictedVal = lvPredictor.lookup(inst->pc->instAddr(), &(inst->predLoadPack));
 
         // If we did predict taken, just set the target to the instruction PC to follow the branch requirements
         if(inst->predictedVal) {

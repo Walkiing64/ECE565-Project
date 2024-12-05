@@ -193,9 +193,6 @@ class MinorDynInst : public RefCounted
     /** Tried to predict the value of this instruction */
     bool predictedVal = false;
 
-    /** Is this a constant prediction */
-    bool constantVal = false;
-
     /** Holds the predicted packet for all integer/floating point loads */
     PacketPtr predLoadPack = nullptr;
 

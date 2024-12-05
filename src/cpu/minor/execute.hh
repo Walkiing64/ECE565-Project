@@ -55,7 +55,6 @@
 #include "cpu/minor/lsq.hh"
 #include "cpu/minor/pipe_data.hh"
 #include "cpu/minor/scoreboard.hh"
-#include "cpu/pred/lv_predictor.hh"
 
 namespace gem5
 {
@@ -128,9 +127,6 @@ class Execute : public Named
 
     /** The execution functional units */
     std::vector<FUPipeline *> funcUnits;
-
-    /** Reference to the CVU in the LVP */
-    CVU &cvu;
 
   public: /* Public for Pipeline to be able to pass it to Decode */
     std::vector<InputBuffer<ForwardInstData>> inputBuffer;
