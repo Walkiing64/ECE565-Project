@@ -176,7 +176,7 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
                 lvPredictor.update(inst->pc->instAddr(), false, inst->loadPack);
 
                 //Also shootdown cvu entries with this address
-                lvPredictor.cvu.invalidate(inst->loadPack->getAddr()); 
+                //lvPredictor.cvu.invalidate(inst->loadPack->getAddr()); 
             }
         }
         break;
@@ -225,7 +225,7 @@ Fetch2::updateBranchPrediction(const BranchData &branch)
             lvPredictor.update(inst->pc->instAddr(), false, inst->loadPack);
             
             //Also shootdown cvu entries with this address
-            lvPredictor.cvu.invalidate(inst->loadPack->getAddr()); 
+            //lvPredictor.cvu.invalidate(inst->loadPack->getAddr()); 
         } else {
             DPRINTF(Branch, "Branch mis-predicted inst: %s\n", *inst);
             branchPredictor.squash(inst->id.fetchSeqNum,

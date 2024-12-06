@@ -35,8 +35,8 @@ bool CVU::lookup(Addr pc, Addr loadAddr) {
 
         //Increment all valid lru values that are less than the old one
         for(int i = 0; i < table.size(); i++) {
-            if(table[idx].valid && table[idx].lru < old_lru) {
-                table[idx].lru++;
+            if(table[i].valid && table[i].lru < old_lru) {
+                table[i].lru++;
             }
         }
 
@@ -57,7 +57,7 @@ void CVU::update(Addr pc, Addr loadAddr) {
             if(!table[i].valid) {
                 table[i] = {.pc = pc, .addr = loadAddr, .lru = 1, .valid = true};
                 numEntries++;
-                DPRINTF(LVP, "Address 0x%x has been place at index %d in the cvu, which was empty\n", loadAddr, i);
+                DPRINTF(LVP, "Address 0x%x has been placed at index %d in the cvu, which was empty\n", loadAddr, i);
 
                 //Increment all other LRU values
                 for(int j = 0; j < table.size(); j++) {
@@ -75,7 +75,7 @@ void CVU::update(Addr pc, Addr loadAddr) {
         //There should be a value with an LRU equal to the table size, it should be the replacement target
         int i;
         for(i = 0; i < table.size(); i++) {
-            if(table[i].lru == table.size()) {
+            if(table[i].valid && table[i].lru == table.size()) {
                 DPRINTF(LVP, "Evicting address 0x%x from the CVU, replacing with address 0x%x\n", table[i].addr, loadAddr);
 
                 table[i] = {.pc = pc, .addr = loadAddr, .lru = 1, .valid = true};
@@ -183,6 +183,7 @@ int LVPredictor::lookup(Addr pc, PacketPtr* packet)
     // Lookup the value and copy it into passed in packet if it is valid 
     if(lvpt[lvpt_idx]) {
         *packet = new Packet(lvpt[lvpt_idx], false, true);
+        (*packet) -> setData(lvpt[lvpt_idx]->getConstPtr<uint8_t>());
         const uint8_t* val = (*packet)->getConstPtr<uint8_t>();
         DPRINTF(LVP, "Returning value {%d, %d, %d, %d, %d, %d, %d, %d} from the LVPT\n",
                 val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7]);
@@ -218,6 +219,7 @@ void LVPredictor::update(Addr pc, bool correct, PacketPtr packet) {
             delete lvpt[lvpt_idx];
         }
         lvpt[lvpt_idx] = new Packet(packet, false, true);
+        lvpt[lvpt_idx]->setData(packet->getConstPtr<uint8_t>());
 
         lct[lct_idx]++;
 
@@ -228,6 +230,7 @@ void LVPredictor::update(Addr pc, bool correct, PacketPtr packet) {
             delete lvpt[lvpt_idx];
         }
         lvpt[lvpt_idx] = new Packet(packet, false, true);
+        lvpt[lvpt_idx]->setData(packet->getConstPtr<uint8_t>());
         
         lct[lct_idx]--;
 
