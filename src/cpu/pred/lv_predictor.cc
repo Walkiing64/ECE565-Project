@@ -66,6 +66,7 @@ bool LVPredictor::lookup(Addr pc, PacketPtr* packet)
     // Lookup the value and copy it into passed in packet if it is valid 
     if(lvpt[lvpt_idx]) {
         *packet = new Packet(lvpt[lvpt_idx], false, true);
+        (*packet) -> setData(lvpt[lvpt_idx]->getConstPtr<uint8_t>());
         const uint8_t* val = (*packet)->getConstPtr<uint8_t>();
         DPRINTF(LVP, "Returning value {%d, %d, %d, %d, %d, %d, %d, %d} from the LVPT\n",
                 val[0], val[1], val[2], val[3], val[4], val[5], val[6], val[7]);
@@ -93,6 +94,7 @@ void LVPredictor::update(Addr pc, bool correct, PacketPtr packet) {
             delete lvpt[lvpt_idx];
         }
         lvpt[lvpt_idx] = new Packet(packet, false, true);
+        lvpt[lvpt_idx]->setData(packet->getConstPtr<uint8_t>());
 
         lct[lct_idx]++;
 
@@ -103,7 +105,8 @@ void LVPredictor::update(Addr pc, bool correct, PacketPtr packet) {
             delete lvpt[lvpt_idx];
         }
         lvpt[lvpt_idx] = new Packet(packet, false, true);
-        
+        lvpt[lvpt_idx]->setData(packet->getConstPtr<uint8_t>());
+
         lct[lct_idx]--;
 
         DPRINTF(LVP, "Due to an incorrect prediction, LVPT[%d] is being updated\n", lvpt_idx);

@@ -304,22 +304,28 @@ Execute::tryToBranch(MinorDynInstPtr inst, Fault fault, BranchData &branch)
         std::array<uint8_t, 8> pred_val = {0};
         std::array<uint8_t, 8> act_val = {0};
 
-        for(int i = 0; i < inst->predLoadPack->getSize(); i++) {
-            pred_val[i] = inst->predLoadPack->getConstPtr<uint8_t>()[i];
-        }
-        for(int i = 0; i < inst->loadPack->getSize(); i++) {
-            act_val[i] = inst->loadPack->getConstPtr<uint8_t>()[i];
-        }
+        if(inst->predLoadPack && inst->loadPack) {
+            for(int i = 0; i < inst->predLoadPack->getSize(); i++) {
+                pred_val[i] = inst->predLoadPack->getConstPtr<uint8_t>()[i];
+            }
+            for(int i = 0; i < inst->loadPack->getSize(); i++) {
+                act_val[i] = inst->loadPack->getConstPtr<uint8_t>()[i];
+            }
 
-        if(pred_val == act_val) {
-            // This is a correctly predicted branch
-            reason = BranchData::CorrectlyPredictedBranch;
-            DPRINTF(LVP, "Predicted Value for inst: %s correctly in execute\n", *inst);
-        }
-        else {
-            // This is a badly predicted branch
-            reason = BranchData::BadlyPredictedBranch;
-            DPRINTF(LVP, "Predicted Value for inst: %s incorrectly in execute\n", *inst);
+            if(pred_val == act_val) {
+                // This is a correctly predicted branch
+                reason = BranchData::CorrectlyPredictedBranch;
+                DPRINTF(LVP, "Predicted Value for inst: %s correctly in execute\n", *inst);
+            }
+            else {
+                // This is a badly predicted branch
+                reason = BranchData::BadlyPredictedBranch;
+                DPRINTF(LVP, "Predicted Value for inst: %s incorrectly in execute\n", *inst);
+            }
+        } else {
+                // This is a badly predicted branch due to a missing packet
+                reason = BranchData::BadlyPredictedBranch;
+                DPRINTF(LVP, "Predicted Value for inst: %s incorrectly in execute (missing packet)\n", *inst);
         }
     }
 
@@ -424,6 +430,7 @@ Execute::handleMemResponse(MinorDynInstPtr inst,
              */
             DPRINTF(LVP, "Retrieving loaded memory value for inst: %s\n", *inst);
             inst->loadPack = new Packet(packet, false, true);
+            inst->loadPack->setData(packet->getConstPtr<uint8_t>());
         }
 
         /* Complete the memory access instruction */
