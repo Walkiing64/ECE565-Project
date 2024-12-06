@@ -55,9 +55,16 @@ void CVU::update(Addr pc, Addr loadAddr) {
         for(i = 0; i < table.size(); i++) {
             // Put it in the first non valid entry
             if(!table[i].valid) {
-                table[i] = {.pc = pc, .addr = loadAddr, .lru = ++numEntries, .valid = true};
-                
+                table[i] = {.pc = pc, .addr = loadAddr, .lru = 1, .valid = true};
+                numEntries++;
                 DPRINTF(LVP, "Address 0x%x has been place at index %d in the cvu, which was empty\n", loadAddr, i);
+
+                //Increment all other LRU values
+                for(int j = 0; j < table.size(); j++) {
+                    if(table[j].valid && j != i) {
+                        table[j].lru++;
+                    }
+                }
                 break;
             }
         }
@@ -71,7 +78,14 @@ void CVU::update(Addr pc, Addr loadAddr) {
             if(table[i].lru == table.size()) {
                 DPRINTF(LVP, "Evicting address 0x%x from the CVU, replacing with address 0x%x\n", table[i].addr, loadAddr);
 
-                table[i] = {.pc = pc, .addr = loadAddr, .lru = numEntries, .valid = true};
+                table[i] = {.pc = pc, .addr = loadAddr, .lru = 1, .valid = true};
+
+                //Increment all other LRU values
+                for(int j = 0; j < table.size(); j++) {
+                    if(table[j].valid && j != i) {
+                        table[j].lru++;
+                    }
+                }
                 break;
             }
         }
@@ -86,9 +100,10 @@ void CVU::invalidate(Addr storeAddr) {
     //the same address)
 
     for(int i = 0; i < table.size(); i++) {
-        if(table[i].addr == storeAddr) {
-            DPRINTF(LVP, "Invalidating address 0x%x at index %d\n and fixing LRU values", storeAddr, i);
+        if(table[i].valid && table[i].addr == storeAddr) {
+            DPRINTF(LVP, "Invalidating address 0x%x at index %d and fixing LRU values\n", storeAddr, i);
             table[i].valid = false;
+            numEntries--;
 
             //Now the LRU values must be updated
             int old_lru = table[i].lru;
