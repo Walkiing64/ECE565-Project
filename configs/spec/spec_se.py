@@ -123,6 +123,16 @@ parser = argparse.ArgumentParser()
 Options.addCommonOptions(parser)
 Options.addSEOptions(parser)
 
+# Add LVP specific options
+parser.add_argument("--lvpt_size", 
+                    help=f"Size of the Load Value Prediction Table. Default: 1024 entries")
+parser.add_argument("--lct_size",
+                    help=f"Size of the Load Classification Table. Default: 256 entries")
+parser.add_argument("--lct_bits",
+                    help=f"Number of bits per LCT entry. Default: 2 bits")
+parser.add_argument("--cvu_size",
+                    help=f"Size of the Load Constant Unit. Default: 16 entries")
+
 if '--ruby' in sys.argv:
     Ruby.define_options(parser)
 
@@ -210,6 +220,20 @@ if args.elastic_trace_en:
 # frequency.
 for cpu in system.cpu:
     cpu.clk_domain = system.cpu_clk_domain
+
+# Add the load value predictor to all minor cpus
+if args.cpu_type == "MinorCPU" :
+    for cpu in system.cpu:
+        cpu.lvPred = LVPredictor()
+        if(args.lvpt_size) :
+            cpu.lvPred.LVPTSize = args.lvpt_size
+        if(args.lct_size) :
+            cpu.lvPred.LCTSize = args.lct_size
+        if(args.lct_bits) :
+            cpu.lvPred.LCTBits = args.lct_bits
+        cpu.lvPred.cvu = CVU()
+        if(args.cvu_size) :
+            cpu.lvPred.cvu.cvuSize = args.cvu_size
 
 if ObjectList.is_kvm_cpu(CPUClass) or ObjectList.is_kvm_cpu(FutureClass):
     if buildEnv['TARGET_ISA'] == 'x86':

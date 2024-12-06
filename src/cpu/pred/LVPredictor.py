@@ -15,6 +15,6 @@ class LVPredictor(SimObject) :
     
     LVPTSize = Param.Unsigned(1024, "Number of entries in the Load Value Predictor Table")
     LCTSize = Param.Unsigned(256, "Number of entries in the Load Configuration Table")
-    LCTBits = Param.Unsigned(2, "Number of bits per entry in the Load Configureation Table")
+    LCTBits = Param.Unsigned(2, "Number of bits per entry in the Load Configuration Table")
     instShiftAmt = Param.Unsigned(2, "Number of bits to shift instructions by")
     cvu = Param.CVU(CVU(), "CVU attatched to this LVP")
