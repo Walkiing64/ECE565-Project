@@ -7,6 +7,10 @@
 #include "params/LVPredictor.hh"
 #include "sim/sim_object.hh"
 #include "base/sat_counter.hh"
+#include "base/statistics.hh"
+#include "base/stats/info.hh"
+#include "base/stats/storage.hh"
+#include "base/stats/types.hh"
 #include "mem/packet.hh"
 
 namespace gem5 
@@ -81,6 +85,7 @@ namespace gem5
              */
             ~LVPredictor();
 
+            void regStats() override;
             /**
              * Looks up the predicted value at the given pc addr.
              * @param pc The address of the loads pc
@@ -106,6 +111,9 @@ namespace gem5
             CVU &cvu;
         
         private:
+
+            statistics::Scalar LVPT_total;
+            statistics::Scalar LVPT_hits;
             /**
             *  Returns the taken/not taken prediction given the value of the
             *  counter.

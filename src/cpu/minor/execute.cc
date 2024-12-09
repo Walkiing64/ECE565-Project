@@ -95,7 +95,8 @@ Execute::Execute(const std::string &name_,
             ExecuteThreadInfo(params.executeCommitLimit)),
     interruptPriority(0),
     issuePriority(0),
-    commitPriority(0)
+    commitPriority(0),
+    stats(&cpu_)
 {
     if (commitLimit < 1) {
         fatal("%s: executeCommitLimit must be >= 1 (%d)\n", name_,
@@ -311,9 +312,10 @@ Execute::tryToBranch(MinorDynInstPtr inst, Fault fault, BranchData &branch)
             for(int i = 0; i < inst->loadPack->getSize(); i++) {
                 act_val[i] = inst->loadPack->getConstPtr<uint8_t>()[i];
             }
-
-            if(pred_val == act_val) {
+            stats.TotalLoadsPred++;
+            if (pred_val == act_val) {
                 // This is a correctly predicted branch
+                stats.CorrectlyPredLoads++;
                 reason = BranchData::CorrectlyPredictedBranch;
                 DPRINTF(LVP, "Predicted Value for inst: %s correctly in execute\n", *inst);
             }
@@ -525,12 +527,16 @@ Execute::executeMemRefInst(MinorDynInstPtr inst, BranchData &branch,
 
         //If the cvu entry was not valid, treat it as a predictable load, but also
         //add its address to the table
+
+        stats.TotalConstLoads++;
         if (!valid) {
             inst->constantVal = false;
 
             cvu.update(inst->pc->instAddr(), inst->predLoadPack->getAddr());
         }
-
+        else {
+            stats.CVU_hits++;
+        }
     }
 
     if (!lsq.canRequest()) {
@@ -1953,6 +1959,24 @@ Execute::isDrained()
     }
 
     return true;
+}
+
+Execute::LVPStats::LVPStats(MinorCPU *cpu)
+    : statistics::Group(cpu, "Execute"),
+      ADD_STAT(TotalLoadsPred, statistics::units::Count::get(),
+          "Number of correctly predicted load predictions"),
+      ADD_STAT(CorrectlyPredLoads, statistics::units::Count::get(),
+          "Number of Load instructions"),
+      ADD_STAT(LoadPredAccuracy, statistics::units::Ratio::get(),
+          "LVP Accuracy", CorrectlyPredLoads*100/TotalLoadsPred),
+      ADD_STAT(TotalConstLoads, statistics::units::Count::get(),
+          "Number of Const loads lookedup in CVU"),
+      ADD_STAT(CVU_hits, statistics::units::Count::get(),
+          "Number of CVU hits for Const Loads"),
+      ADD_STAT(CVU_hitrate, statistics::units::Ratio::get(),
+          "CVU_hitrate", CVU_hits*100/TotalConstLoads) {
+      LoadPredAccuracy.precision(2);
+      CVU_hitrate.precision(2);
 }
 
 Execute::~Execute()

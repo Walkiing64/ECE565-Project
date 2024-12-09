@@ -48,6 +48,10 @@
 #include <vector>
 
 #include "base/named.hh"
+#include "base/statistics.hh"
+#include "base/stats/info.hh"
+#include "base/stats/storage.hh"
+#include "base/stats/types.hh"
 #include "base/types.hh"
 #include "cpu/minor/buffers.hh"
 #include "cpu/minor/cpu.hh"
@@ -55,6 +59,7 @@
 #include "cpu/minor/lsq.hh"
 #include "cpu/minor/pipe_data.hh"
 #include "cpu/minor/scoreboard.hh"
+#include "cpu/minor/stats.hh"
 #include "cpu/pred/lv_predictor.hh"
 
 namespace gem5
@@ -214,6 +219,21 @@ class Execute : public Named
     ThreadID interruptPriority;
     ThreadID issuePriority;
     ThreadID commitPriority;
+
+    struct LVPStats : public statistics::Group
+    {
+       LVPStats(MinorCPU *cpu);
+       statistics::Scalar TotalLoadsPred;
+       statistics::Scalar CorrectlyPredLoads;
+       statistics::Formula LoadPredAccuracy;
+       statistics::Scalar TotalCVUlookups;
+       statistics::Scalar CVU_hits;
+       statistics::Formula CVU_hitrate;
+       statistics::Scalar LVPT_lookups;
+       statistics::Scalar LVPT_hits;
+       statistics::Formula LVPT_hitrate;
+       statistics::Scalar TotalConstLoads;
+     } stats;
 
   protected:
     friend std::ostream &operator <<(std::ostream &os, DrainState state);

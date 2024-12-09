@@ -204,6 +204,22 @@ int LVPredictor::lookup(Addr pc, PacketPtr* packet)
     }
 }
 
+void LVPredictor::regStats()
+{
+    SimObject::regStats();
+
+    LVPT_total
+        .name(name() + ".LVPT_total")
+        .desc("Number of LVPT lookups")
+        .prereq(LVPT_total);
+
+
+    LVPT_hits
+        .name(name() + ".LVPT_hits")
+        .desc("Number of correct LVPT hits")
+        .prereq(LVPT_hits);
+}
+
 void LVPredictor::update(Addr pc, bool correct, PacketPtr packet) {
     // If the packet given is not valid, dont update anything
     if(!packet) {
@@ -213,7 +229,9 @@ void LVPredictor::update(Addr pc, bool correct, PacketPtr packet) {
     // Otherwise, update LVPT value and decrement counter
     unsigned lct_idx = getLCTIndex(pc);
     unsigned lvpt_idx = getLVPTIndex(pc);
-    if(correct) {
+    LVPT_total++;
+    if (correct) {
+         LVPT_hits++;
         //Delete the old entry at this position and add a new one
         if(lvpt[lvpt_idx]) {
             delete lvpt[lvpt_idx];
