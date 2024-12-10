@@ -48,6 +48,10 @@
 #include <vector>
 
 #include "base/named.hh"
+#include "base/statistics.hh"
+#include "base/stats/info.hh"
+#include "base/stats/storage.hh"
+#include "base/stats/types.hh"
 #include "base/types.hh"
 #include "cpu/minor/buffers.hh"
 #include "cpu/minor/cpu.hh"
@@ -214,6 +218,17 @@ class Execute : public Named
     ThreadID interruptPriority;
     ThreadID issuePriority;
     ThreadID commitPriority;
+
+    struct LVPStats : public statistics::Group
+    {
+        LVPStats(MinorCPU *cpu);
+        statistics::Scalar TotalLoadsPred;      //number of load instructions
+        statistics::Scalar CorrectlyPredLoads; //Correctly predicted loads
+        statistics::Formula LoadPredAccuracy;
+        statistics::Scalar TotalCVUlookups;
+        statistics::Scalar CVU_hits;
+        statistics::Formula CVU_hitrate;
+    } stats;
 
   protected:
     friend std::ostream &operator <<(std::ostream &os, DrainState state);

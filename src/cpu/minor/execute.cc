@@ -95,7 +95,8 @@ Execute::Execute(const std::string &name_,
             ExecuteThreadInfo(params.executeCommitLimit)),
     interruptPriority(0),
     issuePriority(0),
-    commitPriority(0)
+    commitPriority(0),
+    stats(&cpu_)
 {
     if (commitLimit < 1) {
         fatal("%s: executeCommitLimit must be >= 1 (%d)\n", name_,
@@ -304,8 +305,9 @@ Execute::tryToBranch(MinorDynInstPtr inst, Fault fault, BranchData &branch)
         // Predicted values and loaded value for a posible load instruction
         std::array<uint8_t, 8> pred_val = {0};
         std::array<uint8_t, 8> act_val = {0};
-        if(inst->predLoadPack && inst->loadPack) {
-            for(int i = 0; i < inst->predLoadPack->getSize(); i++) {
+        stats.TotalLoadsPred++;
+        if (inst->predLoadPack && inst->loadPack) {
+            for (int i = 0; i < inst->predLoadPack->getSize(); i++) {
                 pred_val[i] = inst->predLoadPack->getConstPtr<uint8_t>()[i];
             }
             for(int i = 0; i < inst->loadPack->getSize(); i++) {
@@ -314,6 +316,7 @@ Execute::tryToBranch(MinorDynInstPtr inst, Fault fault, BranchData &branch)
 
             if(pred_val == act_val) {
                 // This is a correctly predicted branch
+                stats.CorrectlyPredLoads++;
                 reason = BranchData::CorrectlyPredictedBranch;
                 DPRINTF(LVP, "Predicted Value for inst: %s correctly in execute\n", *inst);
             }
@@ -522,13 +525,15 @@ Execute::executeMemRefInst(MinorDynInstPtr inst, BranchData &branch,
         //(we must use the predicted address as we dont know what the physical address of 
         // the load is before going to the lsq)
         bool valid = cvu.lookup(inst->pc->instAddr(), inst->predLoadPack->getAddr());
+        stats.TotalCVUlookups++;
 
-        //If the cvu entry was not valid, treat it as a predictable load, but also
-        //add its address to the table
         if (!valid) {
             inst->constantVal = false;
 
             cvu.update(inst->pc->instAddr(), inst->predLoadPack->getAddr());
+        }
+        else {
+            stats.CVU_hits++;
         }
 
     }
@@ -1954,6 +1959,24 @@ Execute::isDrained()
 
     return true;
 }
+
+Execute::LVPStats::LVPStats(MinorCPU *cpu)
+    : statistics::Group(cpu, "Execute"),
+      ADD_STAT(TotalLoadsPred, statistics::units::Count::get(),
+          "Number of total load predictions"),
+      ADD_STAT(CorrectlyPredLoads, statistics::units::Count::get(),
+          "Number of correctly predicted load instructions"),
+      ADD_STAT(TotalCVUlookups, statistics::units::Count::get(),
+          "Number of times CVU looked up"),
+      ADD_STAT(CVU_hits, statistics::units::Count::get(),
+          "Number of CVU hits"),
+      ADD_STAT(CVU_hitrate, statistics::units::Ratio::get(),
+          "CVU hitrate", CVU_hits*100/TotalCVUlookups),
+      ADD_STAT(LoadPredAccuracy, statistics::units::Ratio::get(),
+          "LVP Accuracy", CorrectlyPredLoads*100/TotalLoadsPred) {
+      LoadPredAccuracy.precision(2);
+}
+
 
 Execute::~Execute()
 {
