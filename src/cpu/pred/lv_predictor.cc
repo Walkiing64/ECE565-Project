@@ -127,7 +127,8 @@ LVPredictor::LVPredictor(const LVPredictorParams &params) :
     lctSize(params.LCTSize),
     lctBits(params.LCTBits),
     lctIndMask(lctSize - 1),
-    lct(lctSize, SatCounter8(lctBits))
+    lct(lctSize, SatCounter8(lctBits)),
+    stats(this)
 {
     if (!isPowerOf2(lvptSize)) {
         fatal("Invalid LVPT size!\n");
@@ -138,6 +139,20 @@ LVPredictor::LVPredictor(const LVPredictorParams &params) :
     }
 
     DPRINTF(LVP, "Created LVP with LVPT size = %d, LCT size = %d, LCT bits = %d\n", lvptSize, lctSize, lctBits);
+}
+LVPredictor::LVPTStats::LVPTStats(statistics::Group *parent)
+    : statistics::Group(parent),
+      ADD_STAT(LVPTlookups, statistics::units::Count::get(),
+              "Number of LVPT lookups"),
+      ADD_STAT(LVPThits, statistics::units::Count::get(),
+               "Number of LVPT hits"),
+      ADD_STAT(LVPpredloads, statistics::units::Count::get(),
+               "Number of loads LVPT decides to predict "),
+      ADD_STAT(LVPTpredconst, statistics::units::Count::get(),
+               "Number of loads LVPT predicts as constant"),
+      ADD_STAT(LVPThitrate, statistics::units::Ratio::get(),
+               "LVPT hit rate", LVPThits*100/LVPTlookups){
+                LVPThitrate.precision(2);
 }
 
 LVPredictor::~LVPredictor() {
@@ -179,9 +194,10 @@ int LVPredictor::lookup(Addr pc, PacketPtr* packet)
     unsigned lvpt_idx = getLVPTIndex(pc);
 
     DPRINTF(LVP, "Looking up index %d in the LVPT\n", lvpt_idx);
-
-    // Lookup the value and copy it into passed in packet if it is valid 
-    if(lvpt[lvpt_idx]) {
+    stats.LVPTlookups++;
+    // Lookup the value and copy it into passed in packet if it is valid
+    if (lvpt[lvpt_idx]) {
+        stats.LVPThits++;
         *packet = new Packet(lvpt[lvpt_idx], false, true);
         (*packet) -> setData(lvpt[lvpt_idx]->getConstPtr<uint8_t>());
         const uint8_t* val = (*packet)->getConstPtr<uint8_t>();
@@ -195,8 +211,10 @@ int LVPredictor::lookup(Addr pc, PacketPtr* packet)
     
     if(predict) {
         if(constant) {
+            stats.LVPTpredconst++;
             return 2;
         } else {
+            stats.LVPpredloads++;
             return 1;
         }
     } else {

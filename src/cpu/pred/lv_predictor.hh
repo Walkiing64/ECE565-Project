@@ -1,13 +1,15 @@
 #ifndef __CPU_PRED_LV_PREDICTOR_HH__
 #define __CPU_PRED_LV_PREDICTOR_HH__
 
-#include <vector>
 #include <array>
+#include <vector>
 
+#include "base/sat_counter.hh"
+#include "base/statistics.hh"
+#include "base/types.hh"
+#include "mem/packet.hh"
 #include "params/LVPredictor.hh"
 #include "sim/sim_object.hh"
-#include "base/sat_counter.hh"
-#include "mem/packet.hh"
 
 namespace gem5 
 {
@@ -169,6 +171,20 @@ namespace gem5
              * counter
              */
             std::vector<SatCounter8> lct;
+
+            struct LVPTStats : public statistics::Group
+            {
+             LVPTStats(statistics::Group *parent);
+
+             /** Stat for number of BP lookups. */
+             statistics::Scalar LVPTlookups;
+             /** Stat for number of conditional branches predicted. */
+             statistics::Scalar LVPThits;
+             statistics::Scalar LVPTpredconst;
+             statistics::Scalar LVPpredloads;
+              statistics::Formula LVPThitrate;
+           } stats;
+
     };
 } // namespace gem5
 
